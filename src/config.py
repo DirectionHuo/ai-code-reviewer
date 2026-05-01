@@ -9,6 +9,7 @@ class Config:
     ai_api_key: str = ""
     ai_api_base: str = "https://api.openai.com/v1"
     ai_model: str = "gpt-4o"
+    ai_api_protocol: str = "auto"  # "auto", "openai", "anthropic"
     github_token: str = ""
     review_language: str = "zh-CN"
     max_files: int = 20
@@ -25,6 +26,7 @@ class Config:
             ai_api_key=os.getenv("AI_API_KEY", ""),
             ai_api_base=os.getenv("AI_API_BASE", "https://api.openai.com/v1"),
             ai_model=os.getenv("AI_MODEL", "gpt-4o"),
+            ai_api_protocol=os.getenv("AI_API_PROTOCOL", "auto"),
             github_token=os.getenv("GITHUB_TOKEN", ""),
             review_language=os.getenv("REVIEW_LANGUAGE", "zh-CN"),
             max_files=int(os.getenv("MAX_FILES", "20")),
@@ -32,6 +34,13 @@ class Config:
             ignore_patterns=ignore_patterns,
             log_level=os.getenv("LOG_LEVEL", "INFO"),
         )
+
+    def get_protocol(self) -> str:
+        if self.ai_api_protocol != "auto":
+            return self.ai_api_protocol
+        if "anthropic" in self.ai_api_base.lower():
+            return "anthropic"
+        return "openai"
 
     def validate(self) -> list[str]:
         errors = []
