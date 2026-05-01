@@ -1,0 +1,66 @@
+diff --git a/src/auth.py b/src/auth.py
+new file mode 100644
+index 0000000..a1b2c3d
+--- /dev/null
++++ b/src/auth.py
+@@ -0,0 +1,35 @@
++import hashlib
++import sqlite3
++
++DB_PASSWORD = "super_secret_123"
++
++def authenticate(username, password):
++    conn = sqlite3.connect("users.db")
++    cursor = conn.cursor()
++    query = f"SELECT * FROM users WHERE username = '{username}' AND password = '{password}'"
++    cursor.execute(query)
++    result = cursor.fetchone()
++    conn.close()
++    if result:
++        return True
++    return False
++
++def hash_password(password):
++    return hashlib.md5(password.encode()).hexdigest()
++
++def get_user_data(user_id):
++    conn = sqlite3.connect("users.db")
++    cursor = conn.cursor()
++    cursor.execute(f"SELECT * FROM users WHERE id = {user_id}")
++    data = cursor.fetchall()
++    conn.close()
++    results = []
++    for row in data:
++        for item in row:
++            for char in str(item):
++                results.append(char)
++    return results
++
++def process_users(user_ids):
++    for uid in user_ids:
++        data = get_user_data(uid)
++        print(data)
+diff --git a/src/utils.py b/src/utils.py
+index 1234567..89abcde 100644
+--- a/src/utils.py
++++ b/src/utils.py
+@@ -10,7 +10,7 @@ def calculate_total(items):
+     total = 0
+     for item in items:
+-        total += item.price
++        total += item.price * item.quantity
+     return total
+
+@@ -20,3 +20,15 @@ def format_currency(amount):
+     return f"${amount:.2f}"
++
++def parse_config(config_str):
++    """Parse configuration from string."""
++    import yaml
++    return yaml.load(config_str)
++
++def send_email(to, subject, body):
++    import smtplib
++    server = smtplib.SMTP('localhost')
++    server.sendmail('admin@example.com', to, f"Subject: {subject}\n\n{body}")
++    server.quit()
