@@ -104,12 +104,9 @@ def chunk_file_diffs(
     return chunks
 
 
-def call_ai_api(
-    config: Config,
-    system_prompt: str,
-    user_prompt: str,
-    max_retries: int = 3,
-) -> dict:
+def _build_openai_request(
+    config: Config, system_prompt: str, user_prompt: str
+) -> tuple[str, dict, dict]:
     url = f"{config.ai_api_base.rstrip('/')}/chat/completions"
     headers = {
         "Authorization": f"Bearer {config.ai_api_key}",
@@ -124,6 +121,56 @@ def call_ai_api(
         "temperature": 0.1,
         "response_format": {"type": "json_object"},
     }
+    return url, headers, payload
+
+
+def _extract_openai_content(data: dict) -> str:
+    return data["choices"][0]["message"]["content"]
+
+
+def _build_anthropic_request(
+    config: Config, system_prompt: str, user_prompt: str
+) -> tuple[str, dict, dict]:
+    url = f"{config.ai_api_base.rstrip('/')}/v1/messages"
+    headers = {
+        "x-api-key": config.ai_api_key,
+        "Content-Type": "application/json",
+        "anthropic-version": "2023-06-01",
+    }
+    payload = {
+        "model": config.ai_model,
+        "max_tokens": 4096,
+        "system": system_prompt,
+        "messages": [
+            {"role": "user", "content": user_prompt},
+        ],
+        "temperature": 0.1,
+    }
+    return url, headers, payload
+
+
+def _extract_anthropic_content(data: dict) -> str:
+    for block in data.get("content", []):
+        if block.get("type") == "text":
+            return block["text"]
+    raise KeyError("No text content in Anthropic response")
+
+
+def call_ai_api(
+    config: Config,
+    system_prompt: str,
+    user_prompt: str,
+    max_retries: int = 3,
+) -> dict:
+    protocol = config.get_protocol()
+    logger.info("Using %s protocol", protocol)
+
+    if protocol == "anthropic":
+        url, headers, payload = _build_anthropic_request(config, system_prompt, user_prompt)
+        extract_content = _extract_anthropic_content
+    else:
+        url, headers, payload = _build_openai_request(config, system_prompt, user_prompt)
+        extract_content = _extract_openai_content
 
     for attempt in range(max_retries):
         try:
@@ -132,7 +179,7 @@ def call_ai_api(
             )
             resp.raise_for_status()
             data = resp.json()
-            content = data["choices"][0]["message"]["content"]
+            content = extract_content(data)
             result = parse_ai_response(content)
             return result
         except (requests.RequestException, KeyError) as e:
